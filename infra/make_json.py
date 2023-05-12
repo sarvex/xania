@@ -5,11 +5,13 @@ from argparse import ArgumentParser
 
 
 def main(args):
-    obj = {}
     config = ConfigParser()
     config.read(args.credentials)
-    obj["MY_ACCESS_KEY"] = config.get("default", "aws_access_key_id",
-                                      fallback="")
+    obj = {
+        "MY_ACCESS_KEY": config.get(
+            "default", "aws_access_key_id", fallback=""
+        )
+    }
     obj["MY_SECRET_KEY"] = config.get("default", "aws_secret_access_key",
                                       fallback="")
     if os.path.exists(args.output):

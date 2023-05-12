@@ -59,8 +59,7 @@ class EquipGiveReset:
         self.after_arg2 = after_arg2
         self.drop_rate = 100
     def __repr__(self):
-        return "<%s %s before_arg2:%s object_vnum:%s after_arg2:%s>" % (
-            self.__class__.__name__, id(self), self.before_arg2, self.object_vnum, self.after_arg2)
+        return f"<{self.__class__.__name__} {id(self)} before_arg2:{self.before_arg2} object_vnum:{self.object_vnum} after_arg2:{self.after_arg2}>"
 
 class Mobile:
     healer_trainer_act_bits = re.compile("[abJK]")
@@ -72,9 +71,11 @@ class Mobile:
     
     # Can this mob have resets with dynamic drop rates?
     def has_dyn_drop_rates(self):
-        return not (self.level < 20 
-            or self.vnum in shops
-            or self.healer_trainer_act_bits.search(self.act_flags) is not None)
+        return (
+            self.level >= 20
+            and self.vnum not in shops
+            and self.healer_trainer_act_bits.search(self.act_flags) is None
+        )
     
     # Print out the adjusted Equip/Give resets cached for this mob and clear the cache
     # because the RESETS section enables same mob vnum can be instantiated more than once,
@@ -131,7 +132,7 @@ class Object:
         return not Object.object_types_fixed_drop_rate.search(self.object_type)
 
     def __repr__(self):
-        return "<%s %s %s>" % (self.__class__.__name__, id(self), self.object_type)
+        return f"<{self.__class__.__name__} {id(self)} {self.object_type}>"
 
 # Make two passes over the area files. The first is to load up a minimal amount of mobile
 # and object data so that when analyzing the resets in the second pass. The second pass copies
@@ -169,7 +170,7 @@ def load_database(filename):
                         parser.tilde_depth += 1
                     elif parser.tilde_depth == 5:
                         matches = Parser.mob_act_line.fullmatch(line)
-                        assert matches is not None,  "bad mob act line #{}, {}".format(parser.current_vnum, line) 
+                        assert matches is not None, f"bad mob act line #{parser.current_vnum}, {line}"
                         mobs[parser.current_vnum].act_flags = matches.group(1)
                         parser.tilde_depth = 0
                     elif matches := Parser.mob_level_line.match(line):
@@ -207,21 +208,20 @@ def rewrite_area(filename):
                     if parser.current_vnum is not None:
                         mobs[parser.current_vnum].output_resets()
                     parser.current_vnum = int(matches.group(1))
-                # An (E)quip or (G)ive line, a mobile reset context must exist
                 elif matches := Parser.equip_give_line.match(line):
-                    assert parser.current_vnum is not None, "Expected current_vnum before E/G reset: " + line
+                    assert (
+                        parser.current_vnum is not None
+                    ), f"Expected current_vnum before E/G reset: {line}"
                     equip_give_reset = EquipGiveReset(matches.group(1), int(matches.group(2)), matches.group(3))
                     mobs[parser.current_vnum].equip_give_resets.append(equip_give_reset)
                     continue
-                # Any other kind of reset line including the final 'S' that ends the RESETS section,
-                # unbuffer the last mob's resets if we have one
                 elif matches := Parser.other_reset_line.match(line):
                     if parser.current_vnum is not None:
                         mobs[parser.current_vnum].output_resets()
                         parser.current_vnum = None
 
             print(line, end = "")
-    os.unlink(filename + ".bak")
+    os.unlink(f"{filename}.bak")
 
 if __name__ == "__main__":
     rewrite_areas()
